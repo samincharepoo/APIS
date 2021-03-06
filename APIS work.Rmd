@@ -1,0 +1,172 @@
+---
+title: "APIS"
+output: html_document
+---
+
+
+```{r packages}
+library(xml2)
+library(jsonlite)
+library(DT)
+library(httr) # for https
+```
+
+```{r}
+install.packages('plyr', repos = "http://cran.us.r-project.org")
+```
+
+
+
+**The functions is to percent-encode or decode characters in URLs**
+
+**takes in a search term for a title, then fetches the results from api.plos.org/, converts them to an R-friendly format, and returns them.**
+
+
+
+
+```{r}
+searchTerm=function(titel){
+  base="http://api.plos.org/search?q=title:"
+  htmlresp=GET(paste0(base,titel))
+  newjson=fromJSON(content(htmlresp,"text"))
+  return(newjson)
+  
+}
+```
+
+
+
+
+
+**the search returns at most 10 results**
+
+
+
+
+```{r}
+output=searchTerm("DNA")
+output
+
+```
+
+
+
+
+
+```{r}
+str(output)
+```
+
+```{r}
+str(output[[1]])
+```
+
+
+
+
+```{r}
+extraction<-as.data.frame(output)
+extraction
+
+```
+```{r}
+abstract <- as.vector(extraction['response.docs.abstract'])
+for(i in abstract){ 
+  print(i)
+}
+abstract
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#step2
+```{r}
+install.packages("tm")  # for text mining
+install.packages("SnowballC") # for text stemming
+install.packages("wordcloud") # word-cloud generator 
+install.packages("RColorBrewer") # color palettes
+# Load
+library(tm)
+library(SnowballC)
+library(wordcloud)
+library(RColorBrewer)
+```
+
+#step3
+```{r}
+docs<-Corpus(VectorSource(abstract))
+```
+
+```{r}
+inspect(docs)
+```
+
+#textTransformation
+
+```{r}
+toSpace <- content_transformer(function (x , pattern ) gsub(pattern, " ", x))
+docs <- tm_map(docs, toSpace, "/")
+docs <- tm_map(docs, toSpace, "@")
+docs <- tm_map(docs, toSpace, "\\|")
+```
+```{r}
+# Convert the text to lower case
+docs <- tm_map(docs, content_transformer(tolower))
+# Remove numbers
+docs <- tm_map(docs, removeNumbers)
+# Remove english common stopwords
+docs <- tm_map(docs, removeWords, stopwords("english"))
+# Remove your own stop word
+# specify your stopwords as a character vector
+docs <- tm_map(docs, removeWords, c("blabla1", "blabla2")) 
+# Remove punctuations
+docs <- tm_map(docs, removePunctuation)
+# Eliminate extra white spaces
+docs <- tm_map(docs, stripWhitespace)
+# Text stemming
+# docs <- tm_map(docs, stemDocument)
+```
+#step4
+```{r}
+dtm <- TermDocumentMatrix(docs)
+m <- as.matrix(dtm)
+v <- sort(rowSums(m),decreasing=TRUE)
+d <- data.frame(word = names(v),freq=v)
+head(d, 10)
+```
+
+#step5
+```{r}
+set.seed(1234)
+wordcloud(words = d$word, freq = d$freq, min.freq = 1,
+          max.words=150, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
+```
+
+
+
+
+**it is important to remove the stop words because removing stop words will improve the accuracy of the words that are acually most frequently used. If we skip this step, our word cloud would be filled with words that have no information value due to the fact that they are used so much, so words like 'the' or 'also' would be claimed as most frequent, when even though they are, they are not actually not that informative to us for the word cloud.**
+
+?
+
+**min.freq is changing the range of the frequency the cloud will detect. max.words is the maximum number of words that will be plotted/shown in the word cloud. random.order determines if it will be plotting words in random order, false is decreasing frequency so that the largest is in the center and the further from the center, the less frequent it is, and true is random. Other options for colors parameter is 'BuGn', 'Spectral', "BrBG' and more. you can see the list of options for the color parameters using 'display.brewer.all()'**
+
