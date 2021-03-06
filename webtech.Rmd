@@ -1,0 +1,110 @@
+---
+title: "Getting data from the web using R"
+author: Samin Charepoo
+date: Feb 8, 2021
+output:
+  html_document:
+    toc: true
+    number_sections: true
+    self_contained: false
+---
+
+
+```{r readtab1}
+library(XML)
+library(httr)
+library(stringr)
+library(DT)
+library(googleVis)
+library(ggmap)
+
+library(xml2)
+library(jsonlite)
+
+?readHTMLTable
+```
+
+
+# Get Data
+```{r getdata}
+myurl="https://en.wikipedia.org/wiki/List_of_U.S._states_and_territories_by_population"
+mypage=GET(myurl, user_agent="httr") #httr just means its a webpage
+mytabs=readHTMLTable(content(mypage, as="text")) #find tables for this page and use the content from this page
+length(mytabs)
+poptab=mytabs[[1]] #we want the first population tab
+dim(poptab) #looking at dimenstions, 62 rows, 16 colums
+poptab
+```
+
+
+
+# View data
+
+```{r DT1}
+mydt=datatable(poptab,
+  extensions = 'FixedColumns',
+  options = list(
+  dom = 't',
+  scrollX = TRUE,
+  scrollY="300px",
+  paging = FALSE
+    )
+)
+```
+##
+
+```{r DT2}
+mydt
+```
+
+
+
+```{r}
+mypop=poptab[-(1:2),3:4] #get rid of 1 and 2, take 3 and 4
+names(mypop)=c("statename","pop") #naming the rows
+
+mypop
+```
+
+
+
+## Clean up
+
+```{r pop1}
+mypop$pop=as.character(mypop$pop)
+mypop$popcln=sapply(mypop$pop,function(x){strsplit(x,split="[",fixed=TRUE)[[1]][1]}) #split looks for square bracket and gets rid of it(gets rid of footnotes) 
+mypop$popcln=gsub(",","",mypop$popcln) #gets rid of all the commas
+mypop$popcln=as.numeric(mypop$popcln) #force it to be numeric
+mypop[is.na(mypop$popcln),] #check that it is numeric
+
+mypop
+```
+
+#  remove the leading space
+
+```{r factor}
+mypop$statename=as.character(mypop$statename)
+mypop$statename=str_trim(mypop$statename)
+```
+
+# Now,  we can filter the data to the 50 states
+
+```{r filter}
+mypop50=mypop[mypop$statename%in%state.name,]#state.name filters it so that mypop50 have only 50 official states in it
+mypop50
+```
+
+# Plot the data
+
+```{r plot1, results="asis"}
+op <- options(gvis.plot.tag = "chart")
+
+mymap=gvisGeoChart(mypop50, locationvar="statename", colorvar="popcln",
+   options=list(region="US", displayMode="regions",
+      resolution="provinces"
+   ))
+
+plot(mymap)
+```
+
+
